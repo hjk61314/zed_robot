@@ -1,4 +1,4 @@
-SET(execName ZED_with_OpenCV)
+SET(execName ZED_ROBOT)
 CMAKE_MINIMUM_REQUIRED(VERSION 2.4)
 PROJECT(${execName})
 

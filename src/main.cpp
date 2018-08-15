@@ -14,6 +14,9 @@ cv::Mat slMat2cvMat(sl::Mat& input);
 void printHelp();
 void* test_thread(void* args);
 void transformPose(sl::Transform &pose, float tx);
+void create_localmap(cv::Mat& image);
+void writeMatToFile(sl::Mat& m, const char* filename);
+
 
 int main(int argc, char **argv) {
 
@@ -53,7 +56,9 @@ int main(int argc, char **argv) {
     cv::Mat image_ocv = slMat2cvMat(image_zed);
     sl::Mat depth_image_zed(new_width, new_height, sl::MAT_TYPE_8U_C4);
     cv::Mat depth_image_ocv = slMat2cvMat(depth_image_zed);
-    sl::Mat point_cloud;
+
+    sl::Mat depth_map;
+//    sl::Mat point_cloud;
 
 
     sl::Pose camera_pose;
@@ -77,10 +82,11 @@ int main(int argc, char **argv) {
             // Retrieve the left image, depth image in half-resolution
             zed.retrieveImage(image_zed, sl::VIEW_LEFT, sl::MEM_CPU, new_width, new_height);
             zed.retrieveImage(depth_image_zed, sl::VIEW_DEPTH, sl::MEM_CPU, new_width, new_height);
+            zed.retrieveMeasure(depth_map, sl::MEASURE_DEPTH,sl::MEM_CPU);
+
 
             // Retrieve the RGBA point cloud in half-resolution
-            // To learn how to manipulate and display point clouds, see Depth Sensing sample
-            zed.retrieveMeasure(point_cloud, sl::MEASURE_XYZRGBA, sl::MEM_CPU, new_width, new_height);
+//            zed.retrieveMeasure(point_cloud, sl::MEASURE_XYZRGBA, sl::MEM_CPU, new_width, new_height);
 
             // Display image and depth using cv:Mat which share sl:Mat data
             cv::imshow("Image", image_ocv);
@@ -92,7 +98,6 @@ int main(int argc, char **argv) {
                 transformPose(camera_pose.pose_data, translation_left_to_center);
 
                 // Get the pose of the camera relative to the world frame
-                //sl::float4 quaternion = camera_pose.getOrientation();
                 sl::float3 rotation = camera_pose.getEulerAngles();
                 sl::float3 translation = camera_pose.getTranslation();
                 snprintf(text_rotation, 128, "%3.2f; %3.2f; %3.2f", rotation.x, rotation.y, rotation.z);
@@ -101,13 +106,19 @@ int main(int argc, char **argv) {
 //                cout<<"translation:"<<text_translation<<endl;
             }
 
-            // create localmap
-
+            //using not localmap, for its values are accurate except black holes parts
+            create_localmap(depth_image_ocv);
 
 
             key = cv::waitKey(10);
             if(key == 'h'){
-                cout << "depth size "<< depth_image_ocv.size <<endl;
+                cout << depth_map.getInfos() <<endl;
+                //cv::imwrite(string("./depthMap.png"),depth_image_zed);
+
+                clock_t start = clock();
+                writeMatToFile(depth_map,"myDepthMap.txt");
+                double duration = (double)(clock() - start) / CLOCKS_PER_SEC;
+                std::cout<<"save time :"<<duration<<std::endl;
             }
 
             processKeyEvent(zed, key);
@@ -115,6 +126,46 @@ int main(int argc, char **argv) {
     }
     zed.close();
     return 0;
+}
+
+void create_localmap(cv::Mat& depthImage){
+    int row = depthImage.rows;
+    int col = depthImage.cols;
+    for(int i=0; i<row; i++) {
+        for(int j=0; j<col; j++) {
+
+      }
+    }
+}
+
+void writeMatToFile(sl::Mat& m, const char* filename)
+{
+    std::ofstream fout(filename);
+
+    if(!fout) {
+        std::cout<<"File Not Opened"<<std::endl;
+        return;
+    }
+    sl::float1 depthVal;
+    int row = m.getHeight();
+    int col = m.getWidth();
+    for(int i=0; i<row; i++) {
+        for(int j=0; j<col-1; j++) {
+            m.getValue(i, j, &depthVal);
+            fout << depthVal <<",";
+
+//            if(isValidMeasure(depthVal))
+//                fout<<depthVal<<std::endl;
+//            else
+//                cout<<"unvalid"<<endl;
+
+        }
+        m.getValue(i, col-1, &depthVal);
+        fout << depthVal <<endl;
+
+    }
+
+    fout.close();
 }
 
 void* test_thread(void* args){
