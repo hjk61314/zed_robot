@@ -13,6 +13,7 @@ using namespace std;
 cv::Mat slMat2cvMat(sl::Mat& input);
 void printHelp();
 void* test_thread(void* args);
+void transformPose(sl::Transform &pose, float tx);
 
 int main(int argc, char **argv) {
 
@@ -21,23 +22,25 @@ int main(int argc, char **argv) {
     // Set configuration parameters
     sl::InitParameters init_params;
     init_params.camera_resolution = sl::RESOLUTION_HD720;
-    init_params.depth_mode = sl::DEPTH_MODE_ULTRA;
+    init_params.depth_mode = sl::DEPTH_MODE_PERFORMANCE;
     init_params.coordinate_units = sl::UNIT_METER;
-
-    if (argc > 1) init_params.svo_input_filename.set(argv[1]);
+    init_params.coordinate_system = sl::COORDINATE_SYSTEM_RIGHT_HANDED_Y_UP;
         
     sl::ERROR_CODE err = zed.open(init_params);
     if (err != sl::SUCCESS) {
-        printf("%s\n", toString(err).c_str());
+        std::cout << sl::toString(err) << std::endl;
         zed.close();
         return 1; // Quit if an error occurred
     }
 
-    printHelp();
+    // Set positional tracking parameters
+    sl::TrackingParameters trackingParameters;
+    trackingParameters.initial_world_transform = sl::Transform::identity();
+    trackingParameters.enable_spatial_memory = true;
+    // Start motion tracking
+    zed.enableTracking(trackingParameters);
 
-    // Set runtime parameters after opening the camera
-    sl::RuntimeParameters runtime_parameters;
-    runtime_parameters.sensing_mode = sl::SENSING_MODE_STANDARD;
+    printHelp();
 
     // Prepare new image size to retrieve half-resolution images
     sl::Resolution image_size = zed.getResolution();
@@ -52,17 +55,24 @@ int main(int argc, char **argv) {
     cv::Mat depth_image_ocv = slMat2cvMat(depth_image_zed);
     sl::Mat point_cloud;
 
-    pthread_t tidMap;
-    int ret = pthread_create(&tidMap, NULL, test_thread, NULL);
-    if(ret != 0){
-        cout << "pthread_create error: error_code = "<< ret << endl;
-    }
+
+    sl::Pose camera_pose;
+
+//    pthread_t tidMap;
+//    int ret = pthread_create(&tidMap, NULL, test_thread, NULL);
+//    if(ret != 0){
+//        cout << "pthread_create error: error_code = "<< ret << endl;
+//    }
 
 
+    // Get the distance between the center of the camera and the left eye
+    float translation_left_to_center = zed.getCameraInformation().calibration_parameters.T.x * 0.5f;//6cm
+    char text_rotation[128];
+    char text_translation[128];
     char key = ' ';
     while (key != 'q') {
 
-        if (zed.grab(runtime_parameters) == sl::SUCCESS) {
+        if (zed.grab() == sl::SUCCESS) {
 
             // Retrieve the left image, depth image in half-resolution
             zed.retrieveImage(image_zed, sl::VIEW_LEFT, sl::MEM_CPU, new_width, new_height);
@@ -75,6 +85,21 @@ int main(int argc, char **argv) {
             // Display image and depth using cv:Mat which share sl:Mat data
             cv::imshow("Image", image_ocv);
             cv::imshow("Depth", depth_image_ocv);
+
+            sl::TRACKING_STATE tracking_state = zed.getPosition(camera_pose, sl::REFERENCE_FRAME_WORLD);
+            if (tracking_state == sl::TRACKING_STATE_OK) {
+                // Get the pose at the center of the camera (baseline/2 on X axis)
+                transformPose(camera_pose.pose_data, translation_left_to_center);
+
+                // Get the pose of the camera relative to the world frame
+                sl::float4 quaternion = camera_pose.getOrientation();
+                sl::float3 rotation = camera_pose.getEulerAngles();
+                sl::float3 translation = camera_pose.getTranslation();
+                snprintf(text_rotation, 128, "%3.2f; %3.2f; %3.2f", rotation.x, rotation.y, rotation.z);
+                snprintf(text_translation, 128, "%3.2f; %3.2f; %3.2f", translation.x, translation.y, translation.z);
+                cout<<"rotation:"<<text_rotation<<endl;
+                cout<<"translation:"<<text_translation<<endl;
+            }
 
             key = cv::waitKey(10);
             if(key == 'h'){
@@ -96,6 +121,15 @@ void* test_thread(void* args){
     }
 }
 
+// The generic formula used here is: Pose(new reference frame) = M.inverse() * Pose (camera frame) * M, where M is the transform between two frames.
+void transformPose(sl::Transform &pose, float tx) {
+    sl::Transform transform_;
+    transform_.setIdentity();
+    // Move the tracking frame by tx along the X axis
+    transform_.tx = tx;
+    // Apply the transformation
+    pose = sl::Transform::inverse(transform_) * pose * transform_;
+}
 
 
 // Conversion function between sl::Mat and cv::Mat
