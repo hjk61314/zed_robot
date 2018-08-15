@@ -92,18 +92,22 @@ int main(int argc, char **argv) {
                 transformPose(camera_pose.pose_data, translation_left_to_center);
 
                 // Get the pose of the camera relative to the world frame
-                sl::float4 quaternion = camera_pose.getOrientation();
+                //sl::float4 quaternion = camera_pose.getOrientation();
                 sl::float3 rotation = camera_pose.getEulerAngles();
                 sl::float3 translation = camera_pose.getTranslation();
                 snprintf(text_rotation, 128, "%3.2f; %3.2f; %3.2f", rotation.x, rotation.y, rotation.z);
                 snprintf(text_translation, 128, "%3.2f; %3.2f; %3.2f", translation.x, translation.y, translation.z);
-                cout<<"rotation:"<<text_rotation<<endl;
-                cout<<"translation:"<<text_translation<<endl;
+//                cout<<"rotation:"<<text_rotation<<endl;
+//                cout<<"translation:"<<text_translation<<endl;
             }
+
+            // create localmap
+
+
 
             key = cv::waitKey(10);
             if(key == 'h'){
-
+                cout << "depth size "<< depth_image_ocv.size <<endl;
             }
 
             processKeyEvent(zed, key);
