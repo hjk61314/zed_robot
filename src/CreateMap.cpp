@@ -57,11 +57,11 @@ void create_map(sl::Mat& point_cloud, sl::Transform& camera_pose)
                     // to do
 
                     // drop these points to corresponding grids in global occupancy map buffer
-                    int grid_i = ceil(point_camFrame.at<float>(0,0)/GLOBALMAP_RESOLUTION) + GLOBALMAP_SIZE/2;//cartisian frame to image frame
+                    int grid_i = floor(point_camFrame.at<float>(0,0)/GLOBALMAP_RESOLUTION) + GLOBALMAP_SIZE/2;//cartisian frame to image frame
                     if((grid_i < 0) || (grid_i >= GLOBALMAP_SIZE))
                         continue;
 
-                    int grid_j = GLOBALMAP_SIZE/2 - ceil(point_camFrame.at<float>(1,0)/GLOBALMAP_RESOLUTION);
+                    int grid_j = GLOBALMAP_SIZE/2 - floor(point_camFrame.at<float>(1,0)/GLOBALMAP_RESOLUTION);
                     if((grid_j < 0) || (grid_j >= GLOBALMAP_SIZE))
                         continue;
 
