@@ -134,3 +134,4 @@ void saveSbSImage(Camera& zed, std::string filename) {
     cv::cvtColor(sbs_image, sbs_image, CV_RGBA2RGB);
     cv::imwrite(filename, sbs_image);
 }
+
